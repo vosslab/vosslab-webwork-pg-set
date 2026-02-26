@@ -15,6 +15,15 @@ vosslab-webwork-pg-set is a repository of WeBWorK `PG` and `PGML` problems for b
 3. Copy it into your WeBWorK course templates area, keeping directory structure intact.
 4. Add it to an assignment and preview in WeBWorK.
 
+## Related repositories
+
+- [../biology-problems](../biology-problems): Biology problem generators and source content.
+- [../biology-problems-website](../biology-problems-website): Website/docs surface for biology problem content.
+- [../webwork-pg-renderer](../webwork-pg-renderer): Local renderer tooling for WeBWorK PG/PGML preview and checks.
+- [../webwork-pgml-opl-training-set](../webwork-pgml-opl-training-set): PGML/OPL training and reference problem set.
+- [../qti_package_maker](../qti_package_maker): QTI export/package tooling used with problem pipelines.
+- [../ADAPT-WeBWorK-Handbook](../ADAPT-WeBWorK-Handbook): Handbook and guidance for ADAPT/WeBWorK workflows.
+
 ## Status
 
 This repository is an active question bank and should be validated in your target WeBWorK environment before course release.
