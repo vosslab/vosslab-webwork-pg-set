@@ -1,0 +1,193 @@
+## TITLE('Biochemistry: What is a Chemical Reaction?')
+## DESCRIPTION
+## Multiple-choice question testing whether students can identify the
+## defining characteristics of a chemical reaction and distinguish
+## chemical changes from physical changes.
+## ENDDESCRIPTION
+## KEYWORDS('chemical reaction','physical change','bond breaking','bond forming','reactants','products')
+## DBsubject('Biochemistry')
+## DBchapter('Thermodynamics')
+## DBsection('Chemical Reactions')
+## Level(1)
+## Date('2026-02-26')
+## Author('Dr. Neil R. Voss')
+## Institution('Roosevelt University')
+## Language(en)
+# https://github.com/vosslab
+# This work is licensed under CC BY 4.0 (Creative Commons Attribution 4.0
+# International License).
+# https://creativecommons.org/licenses/by/4.0/
+# Source code portions are licensed under LGPLv3.
+
+DOCUMENT();
+
+loadMacros(
+	'PGstandard.pl',
+	'PGML.pl',
+	'parserRadioButtons.pl',
+	'PGcourse.pl',
+);
+
+$showPartialCorrectAnswers = 0;
+
+# ----------------------------
+# 1) HTML emphasis spans
+# ----------------------------
+my $chemical_rxn_emph = "<span style='color:#0066cc;font-weight:700;'>chemical reaction</span>";
+my $physical_change_emph = "<span style='color:#cc6600;font-weight:700;'>physical change</span>";
+
+# ----------------------------
+# 2) Scenario definitions
+# ----------------------------
+my @scenarios = (
+	# Scenario 1: best description of a chemical reaction
+	{
+		prompt => "Which statement <strong>best</strong> describes a $chemical_rxn_emph?",
+		choices => [
+			"covalent bonds are broken and new bonds are formed, converting reactants into products",
+			"a substance changes shape or state but retains the same chemical composition",
+			"molecules move from an area of high concentration to low concentration",
+			"energy is transferred between objects until thermal equilibrium is reached",
+		],
+		correct_index => 0,
+		solution => "A chemical reaction involves the breaking and forming of covalent bonds, transforming reactants into chemically distinct products. Changes in shape, state, concentration, or temperature without new bond formation are physical processes.",
+	},
+	# Scenario 2: identify which process is a chemical reaction
+	{
+		prompt => "Which of the following processes is a $chemical_rxn_emph?",
+		choices => [
+			"combustion of methane gas producing carbon dioxide and water",
+			"dissolving sugar in water",
+			"ice melting into liquid water",
+			"evaporation of rubbing alcohol from a surface",
+		],
+		correct_index => 0,
+		solution => "Combustion of methane (CH<sub>4</sub> + 2O<sub>2</sub> &rarr; CO<sub>2</sub> + 2H<sub>2</sub>O) breaks and forms covalent bonds, producing new substances. Dissolving, melting, and evaporation are physical changes that do not alter chemical identity.",
+	},
+	# Scenario 3: identify which process is a chemical reaction (rusting)
+	{
+		prompt => "Which of the following processes is a $chemical_rxn_emph?",
+		choices => [
+			"rusting of an iron nail exposed to moist air",
+			"grinding a solid into a fine powder",
+			"water condensing on a cold glass",
+			"mixing sand and gravel together",
+		],
+		correct_index => 0,
+		solution => "Rusting converts iron into iron oxide (Fe<sub>2</sub>O<sub>3</sub>), a new substance with different chemical properties. Grinding, condensing, and mixing are physical changes that do not form new chemical bonds.",
+	},
+	# Scenario 4: key requirement for a chemical reaction
+	{
+		prompt => "What <strong>must</strong> occur for a process to be classified as a $chemical_rxn_emph?",
+		choices => [
+			"new substances with different chemical properties must be formed",
+			"energy must be released as heat or light",
+			"the substance must change from one physical state to another",
+			"the process must be irreversible under all conditions",
+		],
+		correct_index => 0,
+		solution => "The defining feature of a chemical reaction is the formation of new substances with different chemical properties. Not all reactions release energy (endergonic reactions absorb it), not all involve state changes, and many reactions are reversible.",
+	},
+	# Scenario 5: NOT a chemical reaction
+	{
+		prompt => "Which of the following is <strong>NOT</strong> a $chemical_rxn_emph?",
+		choices => [
+			"dissolving table salt (NaCl) in water",
+			"burning a piece of wood in a campfire",
+			"digesting starch into glucose in the small intestine",
+			"photosynthesis converting carbon dioxide and water into glucose",
+		],
+		correct_index => 0,
+		solution => "Dissolving NaCl in water separates existing ions but does not break or form covalent bonds, making it a physical change. Burning wood, digestion, and photosynthesis all involve breaking and forming covalent bonds to produce new substances.",
+	},
+	# Scenario 6: true statement about chemical reactions
+	{
+		prompt => "Which statement about $chemical_rxn_emph<strong>s</strong> is <strong>TRUE</strong>?",
+		choices => [
+			"reactants are transformed into products with different chemical properties",
+			"all chemical reactions release heat to the surroundings",
+			"mixing two substances together always produces a chemical reaction",
+			"chemical reactions only occur at high temperatures",
+		],
+		correct_index => 0,
+		solution => "By definition, a chemical reaction transforms reactants into products that have different chemical properties. Not all reactions release heat (some absorb it), mixing alone does not guarantee a reaction, and many reactions occur at room temperature or below.",
+	},
+	# Scenario 7: biochemistry example of a chemical reaction
+	{
+		prompt => "Which is an example of a $chemical_rxn_emph in living cells?",
+		choices => [
+			"hydrolysis of ATP into ADP and inorganic phosphate",
+			"osmosis of water across a cell membrane",
+			"diffusion of oxygen from the lungs into the blood",
+			"filtration of blood plasma in the kidney glomerulus",
+		],
+		correct_index => 0,
+		solution => "ATP hydrolysis breaks a phosphoanhydride bond and forms new bonds in ADP and inorganic phosphate, producing chemically distinct products. Osmosis, diffusion, and filtration are physical transport processes that do not form new chemical bonds.",
+	},
+	# Scenario 8: biochemistry example (glucose oxidation)
+	{
+		prompt => "Which is an example of a $chemical_rxn_emph in living cells?",
+		choices => [
+			"oxidation of glucose during cellular respiration",
+			"diffusion of carbon dioxide out of a cell",
+			"osmosis of water into a red blood cell",
+			"transport of sodium ions through a membrane channel",
+		],
+		correct_index => 0,
+		solution => "Glucose oxidation (C<sub>6</sub>H<sub>12</sub>O<sub>6</sub> + 6O<sub>2</sub> &rarr; 6CO<sub>2</sub> + 6H<sub>2</sub>O) breaks and forms covalent bonds to produce new substances. Diffusion, osmosis, and ion transport are physical processes that move molecules without changing their chemical identity.",
+	},
+);
+
+# ----------------------------
+# 3) Randomization
+# ----------------------------
+my $local_random = PGrandom->new();
+$local_random->srand($problemSeed);
+my $scenario_index = $local_random->random(0, $#scenarios, 1);
+my $scenario = $scenarios[$scenario_index];
+$prompt = $scenario->{prompt};
+$solution = $scenario->{solution};
+
+# ----------------------------
+# 4) Build RadioButtons
+# ----------------------------
+$rb = RadioButtons(
+	$scenario->{choices},
+	$scenario->{correct_index},
+	labels        => 'ABC',
+	displayLabels => 1,
+	separator     => '<div style="margin-bottom: 0.6em;"></div>',
+);
+
+# ----------------------------
+# 5) Problem text (PGML)
+# ----------------------------
+BEGIN_PGML
+[@ $prompt @]*
+
+[_]{$rb}
+END_PGML
+
+# ----------------------------
+# 6) Hint
+# ----------------------------
+BEGIN_PGML_HINT
+A *chemical reaction* involves breaking existing covalent bonds and forming
+new ones, producing substances with different chemical properties.
+
+A *physical change* alters the form or appearance of a substance (melting,
+dissolving, evaporating) but does not change its chemical identity.
+
+Ask yourself: are new substances with new chemical bonds created? If yes,
+it is a chemical reaction. If the molecules remain chemically the same,
+it is a physical change.
+END_PGML_HINT
+
+# ----------------------------
+# 7) Solution
+# ----------------------------
+BEGIN_PGML_SOLUTION
+[$solution]*
+END_PGML_SOLUTION
+
+ENDDOCUMENT();

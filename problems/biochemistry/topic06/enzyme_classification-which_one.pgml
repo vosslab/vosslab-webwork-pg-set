@@ -1,0 +1,659 @@
+## TITLE('Biochemistry: Classify a reaction by EC enzyme class')
+## DESCRIPTION
+## Given a biochemical reaction shown with RDKit.js molecular structures and cofactor text, select the correct EC enzyme class from six choices. Covers all six EC classes (oxidoreductases, transferases, hydrolases, lyases, isomerases, ligases) with 24 reactions drawn from central metabolism.
+## ENDDESCRIPTION
+## KEYWORDS('enzyme classification','EC number','which one')
+## DBsubject('Biochemistry')
+## DBchapter('Enzymes')
+## DBsection('Enzyme Classification')
+## Level(2)
+## Date('2026-02-26')
+## Author('Dr. Neil R. Voss')
+## Institution('Roosevelt University')
+## Language(en)
+# https://github.com/vosslab
+# https://bsky.app/profile/neilvosslab.bsky.social
+# This work is licensed under CC BY 4.0 (Creative Commons Attribution 4.0
+# International License).
+# https://creativecommons.org/licenses/by/4.0/
+# Source code portions are licensed under LGPLv3.
+
+DOCUMENT();
+
+loadMacros(
+    'PGstandard.pl',
+    'PGML.pl',
+    'PGchoicemacros.pl',
+    'parserRadioButtons.pl',
+    'PGcourse.pl',
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 0;
+
+#==========================================================
+# HELPER FUNCTIONS
+#==========================================================
+
+sub escape_attr {
+  my ($text) = @_;
+  $text =~ s/&/&amp;/g;
+  $text =~ s/"/&quot;/g;
+  $text =~ s/</&lt;/g;
+  $text =~ s/>/&gt;/g;
+  return $text;
+}
+
+# count heavy atoms in SMILES for canvas sizing
+sub count_heavy_atoms {
+  my ($smiles) = @_;
+  return 0 if $smiles eq '';
+  my $count = 0;
+  my $in_bracket = 0;
+  for my $ch (split //, $smiles) {
+    if ($ch eq '[') { $in_bracket = 1; $count++; }
+    elsif ($ch eq ']') { $in_bracket = 0; }
+    elsif (!$in_bracket && $ch ge 'A' && $ch le 'Z') { $count++; }
+  }
+  return $count;
+}
+
+# canvas width scales with sqrt(atom count)
+sub canvas_width {
+  my ($smiles) = @_;
+  my $n = count_heavy_atoms($smiles);
+  my $w = int(80 * sqrt($n));
+  $w = 150 if $w < 150;
+  $w = 380 if $w > 380;
+  return $w;
+}
+
+#==========================================================
+# MOLECULE LOOKUP HASH
+# Each entry: smiles, formula (HTML), label (default name)
+# Questions reference molecules by key to avoid duplication.
+#==========================================================
+
+%molecules = (
+  'ethanol' => {
+    'smiles'  => 'CCO',
+    'formula' => 'C<sub>2</sub>H<sub>6</sub>O',
+    'label'   => 'ethanol',
+  },
+  'acetaldehyde' => {
+    'smiles'  => 'CC=O',
+    'formula' => 'C<sub>2</sub>H<sub>4</sub>O',
+    'label'   => 'acetaldehyde',
+  },
+  'lactate' => {
+    'smiles'  => 'C[C@@H](O)C(=O)O',
+    'formula' => 'C<sub>3</sub>H<sub>6</sub>O<sub>3</sub>',
+    'label'   => 'lactate',
+  },
+  'pyruvate' => {
+    'smiles'  => 'CC(=O)C(=O)O',
+    'formula' => 'C<sub>3</sub>H<sub>4</sub>O<sub>3</sub>',
+    'label'   => 'pyruvate',
+  },
+  'succinate' => {
+    'smiles'  => 'OC(=O)CCC(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>6</sub>O<sub>4</sub>',
+    'label'   => 'succinate',
+  },
+  'fumarate' => {
+    'smiles'  => 'OC(=O)/C=C/C(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>4</sub>O<sub>4</sub>',
+    'label'   => 'fumarate',
+  },
+  'malate' => {
+    'smiles'  => 'OC(=O)C[C@@H](O)C(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>6</sub>O<sub>5</sub>',
+    'label'   => 'malate',
+  },
+  'oxaloacetate' => {
+    'smiles'  => 'OC(=O)CC(=O)C(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>4</sub>O<sub>5</sub>',
+    'label'   => 'oxaloacetate',
+  },
+  'glucose' => {
+    'smiles'  => 'OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O',
+    'formula' => 'C<sub>6</sub>H<sub>12</sub>O<sub>6</sub>',
+    'label'   => 'glucose',
+  },
+  'g6p' => {
+    'smiles'  => 'O=P(O)(O)OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O',
+    'formula' => 'C<sub>6</sub>H<sub>13</sub>O<sub>9</sub>P',
+    'label'   => 'glucose-6-phosphate',
+  },
+  'f6p' => {
+    'smiles'  => 'O=P(O)(O)OC[C@H]1OC(O)(CO)[C@@H](O)[C@@H]1O',
+    'formula' => 'C<sub>6</sub>H<sub>13</sub>O<sub>9</sub>P',
+    'label'   => 'fructose-6-phosphate',
+  },
+  'f16bp' => {
+    'smiles'  => 'O=P(O)(O)OC[C@H]1OC(O)(COP(=O)(O)O)[C@@H](O)[C@@H]1O',
+    'formula' => 'C<sub>6</sub>H<sub>14</sub>O<sub>12</sub>P<sub>2</sub>',
+    'label'   => 'fructose-1,6-bisphosphate',
+  },
+  'aspartate' => {
+    'smiles'  => 'N[C@@H](CC(=O)O)C(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>7</sub>NO<sub>4</sub>',
+    'label'   => 'aspartate',
+  },
+  'l_alanine' => {
+    'smiles'  => 'C[C@@H](N)C(=O)O',
+    'formula' => 'C<sub>3</sub>H<sub>7</sub>NO<sub>2</sub>',
+    'label'   => 'L-alanine',
+  },
+  'd_alanine' => {
+    'smiles'  => 'C[C@H](N)C(=O)O',
+    'formula' => 'C<sub>3</sub>H<sub>7</sub>NO<sub>2</sub>',
+    'label'   => 'D-alanine',
+  },
+  'gly_ala' => {
+    'smiles'  => 'NCC(=O)NC(C)C(=O)O',
+    'formula' => 'C<sub>5</sub>H<sub>10</sub>N<sub>2</sub>O<sub>3</sub>',
+    'label'   => 'Gly-Ala dipeptide',
+  },
+  'glycine' => {
+    'smiles'  => 'NCC(=O)O',
+    'formula' => 'C<sub>2</sub>H<sub>5</sub>NO<sub>2</sub>',
+    'label'   => 'glycine',
+  },
+  'acetylcholine' => {
+    'smiles'  => 'CC(=O)OCC[N+](C)(C)C',
+    'formula' => 'C<sub>7</sub>H<sub>16</sub>NO<sub>2</sub><sup>+</sup>',
+    'label'   => 'acetylcholine',
+  },
+  'choline' => {
+    'smiles'  => 'OCC[N+](C)(C)C',
+    'formula' => 'C<sub>5</sub>H<sub>14</sub>NO<sup>+</sup>',
+    'label'   => 'choline',
+  },
+  'triacetin' => {
+    'smiles'  => 'CC(=O)OCC(OC(=O)C)COC(=O)C',
+    'formula' => 'C<sub>9</sub>H<sub>14</sub>O<sub>6</sub>',
+    'label'   => 'triacetin (triglyceride)',
+  },
+  'glycerol' => {
+    'smiles'  => 'OCC(O)CO',
+    'formula' => 'C<sub>3</sub>H<sub>8</sub>O<sub>3</sub>',
+    'label'   => 'glycerol',
+  },
+  'urea' => {
+    'smiles'  => 'NC(=O)N',
+    'formula' => 'CH<sub>4</sub>N<sub>2</sub>O',
+    'label'   => 'urea',
+  },
+  'co2' => {
+    'smiles'  => 'O=C=O',
+    'formula' => 'CO<sub>2</sub>',
+    'label'   => 'CO<sub>2</sub>',
+  },
+  'citrate' => {
+    'smiles'  => 'OC(=O)CC(O)(CC(=O)O)C(=O)O',
+    'formula' => 'C<sub>6</sub>H<sub>8</sub>O<sub>7</sub>',
+    'label'   => 'citrate',
+  },
+  'isocitrate' => {
+    'smiles'  => 'OC(=O)C[C@@H](C(=O)O)[C@@H](O)C(=O)O',
+    'formula' => 'C<sub>6</sub>H<sub>8</sub>O<sub>7</sub>',
+    'label'   => 'isocitrate',
+  },
+  'dhap' => {
+    'smiles'  => 'OCC(=O)CO',
+    'formula' => 'C<sub>3</sub>H<sub>6</sub>O<sub>3</sub>',
+    'label'   => 'DHAP',
+  },
+  'g3p' => {
+    'smiles'  => 'OC[C@@H](O)C=O',
+    'formula' => 'C<sub>3</sub>H<sub>6</sub>O<sub>3</sub>',
+    'label'   => 'G3P',
+  },
+  'cis_retinal' => {
+    'smiles'  => 'CC1=C(C(CCC1)(C)C)/C=C/C(=C\C=C/C(=C/C=O)/C)/C',
+    'formula' => 'C<sub>20</sub>H<sub>28</sub>O',
+    'label'   => '11-<i>cis</i>-retinal',
+  },
+  'trans_retinal' => {
+    'smiles'  => 'CC1=C(C(CCC1)(C)C)/C=C/C(=C/C=C/C(=C/C=O)/C)/C',
+    'formula' => 'C<sub>20</sub>H<sub>28</sub>O',
+    'label'   => 'all-<i>trans</i>-retinal',
+  },
+  'asparagine' => {
+    'smiles'  => 'N[C@@H](CC(=O)N)C(=O)O',
+    'formula' => 'C<sub>4</sub>H<sub>8</sub>N<sub>2</sub>O<sub>3</sub>',
+    'label'   => 'asparagine',
+  },
+  'glutamate' => {
+    'smiles'  => 'N[C@@H](CCC(=O)O)C(=O)O',
+    'formula' => 'C<sub>5</sub>H<sub>9</sub>NO<sub>4</sub>',
+    'label'   => 'glutamate',
+  },
+  'glutamine' => {
+    'smiles'  => 'N[C@@H](CCC(=O)N)C(=O)O',
+    'formula' => 'C<sub>5</sub>H<sub>10</sub>N<sub>2</sub>O<sub>3</sub>',
+    'label'   => 'glutamine',
+  },
+  'cysteine' => {
+    'smiles'  => 'N[C@@H](CS)C(=O)O',
+    'formula' => 'C<sub>3</sub>H<sub>7</sub>NO<sub>2</sub>S',
+    'label'   => 'cysteine',
+  },
+  'glu_cys' => {
+    'smiles'  => 'OC(=O)[C@@H](N)CCC(=O)N[C@@H](CS)C(=O)O',
+    'formula' => 'C<sub>8</sub>H<sub>14</sub>N<sub>2</sub>O<sub>5</sub>S',
+    'label'   => '&gamma;-glutamylcysteine',
+  },
+);
+
+#==========================================================
+# SHARED ENZYME CLASS CHOICES (COLOR-CODED)
+#==========================================================
+
+@enzyme_choices = (
+  '<span style="color: #e60000; font-weight:700;">EC 1 &ndash; Oxidoreductases</span>',
+  '<span style="color: #0039e6; font-weight:700;">EC 2 &ndash; Transferases</span>',
+  '<span style="color: #009900; font-weight:700;">EC 3 &ndash; Hydrolases</span>',
+  '<span style="color: #e69100; font-weight:700;">EC 4 &ndash; Lyases</span>',
+  '<span style="color: #b30077; font-weight:700;">EC 5 &ndash; Isomerases</span>',
+  '<span style="color: #7b12a1; font-weight:700;">EC 6 &ndash; Ligases</span>',
+);
+
+#==========================================================
+# QUESTION DATA (24 reactions, 4 per EC class)
+# mol_left/mol_right = keys into %molecules hash
+# label_left/label_right = optional label overrides
+# extras_left/right = cofactors shown as text inline
+#==========================================================
+
+@questions_data = (
+  #--- EC 1 Oxidoreductases ---
+  {
+    'item_name'    => 'ethanol + NAD<sup>+</sup> &rarr; acetaldehyde + NADH',
+    'correct'      => $enzyme_choices[0],
+    'explanation'  => 'This is a redox reaction catalyzed by alcohol dehydrogenase. NAD<sup>+</sup> is reduced to NADH while ethanol is oxidized to acetaldehyde.',
+    'mol_left'     => 'ethanol',
+    'mol_right'    => 'acetaldehyde',
+    'extras_left'  => 'NAD<sup>+</sup>',
+    'extras_right' => 'NADH',
+  },
+  {
+    'item_name'    => 'lactate + NAD<sup>+</sup> &rarr; pyruvate + NADH',
+    'correct'      => $enzyme_choices[0],
+    'explanation'  => 'Lactate dehydrogenase oxidizes lactate to pyruvate while reducing NAD<sup>+</sup> to NADH.',
+    'mol_left'     => 'lactate',
+    'mol_right'    => 'pyruvate',
+    'extras_left'  => 'NAD<sup>+</sup>',
+    'extras_right' => 'NADH',
+  },
+  {
+    'item_name'    => 'succinate + FAD &rarr; fumarate + FADH<sub>2</sub>',
+    'correct'      => $enzyme_choices[0],
+    'explanation'  => 'Succinate dehydrogenase oxidizes succinate to fumarate while reducing FAD to FADH<sub>2</sub>.',
+    'mol_left'     => 'succinate',
+    'mol_right'    => 'fumarate',
+    'extras_left'  => 'FAD',
+    'extras_right' => 'FADH<sub>2</sub>',
+  },
+  {
+    'item_name'    => 'malate + NAD<sup>+</sup> &rarr; oxaloacetate + NADH',
+    'correct'      => $enzyme_choices[0],
+    'explanation'  => 'Malate dehydrogenase oxidizes malate to oxaloacetate while reducing NAD<sup>+</sup> to NADH.',
+    'mol_left'     => 'malate',
+    'mol_right'    => 'oxaloacetate',
+    'extras_left'  => 'NAD<sup>+</sup>',
+    'extras_right' => 'NADH',
+  },
+  #--- EC 2 Transferases ---
+  {
+    'item_name'    => 'glucose + ATP &rarr; glucose-6-phosphate + ADP',
+    'correct'      => $enzyme_choices[1],
+    'explanation'  => 'Hexokinase transfers a phosphoryl group from ATP to glucose, making it a transferase (kinase).',
+    'mol_left'     => 'glucose',
+    'mol_right'    => 'g6p',
+    'extras_left'  => 'ATP',
+    'extras_right' => 'ADP',
+  },
+  {
+    'item_name'    => 'fructose-6-phosphate + ATP &rarr; fructose-1,6-bisphosphate + ADP',
+    'correct'      => $enzyme_choices[1],
+    'explanation'  => 'Phosphofructokinase-1 (PFK-1) transfers a phosphoryl group from ATP to fructose-6-phosphate, making it a transferase (kinase).',
+    'mol_left'     => 'f6p',
+    'mol_right'    => 'f16bp',
+    'extras_left'  => 'ATP',
+    'extras_right' => 'ADP',
+  },
+  {
+    'item_name'    => 'aspartate + &alpha;-ketoglutarate &rarr; oxaloacetate + glutamate',
+    'correct'      => $enzyme_choices[1],
+    'explanation'  => 'Aspartate aminotransferase (AST) transfers an amino group from aspartate to &alpha;-ketoglutarate.',
+    'mol_left'     => 'aspartate',
+    'mol_right'    => 'oxaloacetate',
+    'extras_left'  => '&alpha;-ketoglutarate',
+    'extras_right' => 'glutamate',
+  },
+  {
+    'item_name'    => 'alanine + &alpha;-ketoglutarate &rarr; pyruvate + glutamate',
+    'correct'      => $enzyme_choices[1],
+    'explanation'  => 'Alanine aminotransferase (ALT) transfers an amino group from alanine to &alpha;-ketoglutarate.',
+    'mol_left'     => 'l_alanine',
+    'mol_right'    => 'pyruvate',
+    'label_left'   => 'alanine',
+    'extras_left'  => '&alpha;-ketoglutarate',
+    'extras_right' => 'glutamate',
+  },
+  #--- EC 3 Hydrolases ---
+  {
+    'item_name'    => 'Gly-Ala dipeptide + H<sub>2</sub>O &rarr; glycine + alanine',
+    'correct'      => $enzyme_choices[2],
+    'explanation'  => 'A peptidase uses water to cleave the peptide bond, making it a hydrolase.',
+    'mol_left'     => 'gly_ala',
+    'mol_right'    => 'glycine',
+    'extras_left'  => 'H<sub>2</sub>O',
+    'extras_right' => 'alanine',
+  },
+  {
+    'item_name'    => 'acetylcholine + H<sub>2</sub>O &rarr; choline + acetate',
+    'correct'      => $enzyme_choices[2],
+    'explanation'  => 'Acetylcholinesterase uses water to hydrolyze the ester bond in acetylcholine.',
+    'mol_left'     => 'acetylcholine',
+    'mol_right'    => 'choline',
+    'extras_left'  => 'H<sub>2</sub>O',
+    'extras_right' => 'acetate',
+  },
+  {
+    'item_name'    => 'triacetin + 3 H<sub>2</sub>O &rarr; glycerol + 3 acetate',
+    'correct'      => $enzyme_choices[2],
+    'explanation'  => 'Lipase uses water to hydrolyze the ester bonds in triglycerides.',
+    'mol_left'     => 'triacetin',
+    'mol_right'    => 'glycerol',
+    'extras_left'  => '3 H<sub>2</sub>O',
+    'extras_right' => '3 acetate',
+  },
+  {
+    'item_name'    => 'urea + H<sub>2</sub>O &rarr; CO<sub>2</sub> + 2 NH<sub>3</sub>',
+    'correct'      => $enzyme_choices[2],
+    'explanation'  => 'Urease uses water to hydrolyze urea into carbon dioxide and ammonia.',
+    'mol_left'     => 'urea',
+    'mol_right'    => 'co2',
+    'extras_left'  => 'H<sub>2</sub>O',
+    'extras_right' => '2 NH<sub>3</sub>',
+  },
+  #--- EC 4 Lyases ---
+  {
+    'item_name'    => 'fumarate + H<sub>2</sub>O &rarr; malate',
+    'correct'      => $enzyme_choices[3],
+    'explanation'  => 'Fumarase adds water across the double bond of fumarate without hydrolysis. It is classified as a lyase (hydratase), not a hydrolase.',
+    'mol_left'     => 'fumarate',
+    'mol_right'    => 'malate',
+    'extras_left'  => 'H<sub>2</sub>O',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => 'citrate &rarr; isocitrate',
+    'correct'      => $enzyme_choices[3],
+    'explanation'  => 'Aconitase catalyzes a dehydration followed by rehydration (eliminating then adding water across a double bond). It is classified as a lyase.',
+    'mol_left'     => 'citrate',
+    'mol_right'    => 'isocitrate',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => 'fructose-1,6-bisphosphate &rarr; DHAP + G3P',
+    'correct'      => $enzyme_choices[3],
+    'explanation'  => 'Aldolase cleaves a carbon-carbon bond without hydrolysis, making it a lyase.',
+    'mol_left'     => 'dhap',
+    'mol_right'    => 'g3p',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => 'pyruvate &rarr; acetaldehyde + CO<sub>2</sub>',
+    'correct'      => $enzyme_choices[3],
+    'explanation'  => 'Pyruvate decarboxylase removes CO<sub>2</sub> from pyruvate by non-hydrolytic cleavage, making it a lyase.',
+    'mol_left'     => 'pyruvate',
+    'mol_right'    => 'acetaldehyde',
+    'extras_left'  => '',
+    'extras_right' => 'CO<sub>2</sub>',
+  },
+  #--- EC 5 Isomerases ---
+  {
+    'item_name'    => 'DHAP &rarr; glyceraldehyde-3-phosphate (G3P)',
+    'correct'      => $enzyme_choices[4],
+    'explanation'  => 'Triose phosphate isomerase converts between two isomers (DHAP and G3P) without adding or removing atoms.',
+    'mol_left'     => 'dhap',
+    'mol_right'    => 'g3p',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => 'glucose-6-phosphate &rarr; fructose-6-phosphate',
+    'correct'      => $enzyme_choices[4],
+    'explanation'  => 'Phosphoglucose isomerase interconverts an aldose (glucose-6-phosphate) and a ketose (fructose-6-phosphate).',
+    'mol_left'     => 'g6p',
+    'mol_right'    => 'f6p',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => 'L-alanine &rarr; D-alanine',
+    'correct'      => $enzyme_choices[4],
+    'explanation'  => 'Alanine racemase interconverts L- and D-alanine stereoisomers, making it an isomerase (racemase).',
+    'mol_left'     => 'l_alanine',
+    'mol_right'    => 'd_alanine',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  {
+    'item_name'    => '<i>cis</i>-retinal &rarr; <i>trans</i>-retinal',
+    'correct'      => $enzyme_choices[4],
+    'explanation'  => 'Retinal isomerase converts between geometric isomers of retinal, making it an isomerase.',
+    'mol_left'     => 'cis_retinal',
+    'mol_right'    => 'trans_retinal',
+    'extras_left'  => '',
+    'extras_right' => '',
+  },
+  #--- EC 6 Ligases ---
+  {
+    'item_name'    => 'pyruvate + CO<sub>2</sub> + ATP &rarr; oxaloacetate + ADP + P<sub>i</sub>',
+    'correct'      => $enzyme_choices[5],
+    'explanation'  => 'Pyruvate carboxylase joins pyruvate and CO<sub>2</sub> using energy from ATP hydrolysis, making it a ligase.',
+    'mol_left'     => 'pyruvate',
+    'mol_right'    => 'oxaloacetate',
+    'extras_left'  => 'CO<sub>2</sub> + ATP',
+    'extras_right' => 'ADP + P<sub>i</sub>',
+  },
+  {
+    'item_name'    => 'aspartate + NH<sub>3</sub> + ATP &rarr; asparagine + AMP + PP<sub>i</sub>',
+    'correct'      => $enzyme_choices[5],
+    'explanation'  => 'Asparagine synthetase joins aspartate and ammonia using energy from ATP hydrolysis, making it a ligase.',
+    'mol_left'     => 'aspartate',
+    'mol_right'    => 'asparagine',
+    'extras_left'  => 'NH<sub>3</sub> + ATP',
+    'extras_right' => 'AMP + PP<sub>i</sub>',
+  },
+  {
+    'item_name'    => 'glutamate + NH<sub>3</sub> + ATP &rarr; glutamine + ADP + P<sub>i</sub>',
+    'correct'      => $enzyme_choices[5],
+    'explanation'  => 'Glutamine synthetase joins glutamate and ammonia using energy from ATP hydrolysis, making it a ligase.',
+    'mol_left'     => 'glutamate',
+    'mol_right'    => 'glutamine',
+    'extras_left'  => 'NH<sub>3</sub> + ATP',
+    'extras_right' => 'ADP + P<sub>i</sub>',
+  },
+  {
+    'item_name'    => 'glutamate + cysteine + ATP &rarr; &gamma;-glutamylcysteine + ADP + P<sub>i</sub>',
+    'correct'      => $enzyme_choices[5],
+    'explanation'  => 'Glutamate-cysteine ligase joins glutamate and cysteine using energy from ATP hydrolysis, the first step of glutathione biosynthesis.',
+    'mol_left'     => 'cysteine',
+    'mol_right'    => 'glu_cys',
+    'extras_left'  => 'glutamate + ATP',
+    'extras_right' => 'ADP + P<sub>i</sub>',
+  },
+);
+
+#==========================================================
+# SELECT RANDOM QUESTION
+#==========================================================
+
+my $local_random = PGrandom->new();
+$local_random->srand($problemSeed);
+
+$question_idx = $local_random->random(0, scalar(@questions_data) - 1, 1);
+$q = $questions_data[$question_idx];
+
+$item_name = $q->{'item_name'};
+@choices = @enzyme_choices;
+$correct = $q->{'correct'};
+$explanation = $q->{'explanation'};
+
+#==========================================================
+# BUILD VISUAL REACTION EQUATION
+# Looks up molecule data from %molecules hash.
+# Questions can override labels via label_left/label_right.
+#==========================================================
+
+my $mol_left_data  = $molecules{ $q->{'mol_left'} };
+my $mol_right_data = $molecules{ $q->{'mol_right'} };
+
+my $smiles_left  = $mol_left_data->{'smiles'};
+my $smiles_right = $mol_right_data->{'smiles'};
+my $extras_left  = $q->{'extras_left'};
+my $extras_right = $q->{'extras_right'};
+
+# use question label override if present, otherwise molecule default
+my $label_left    = $q->{'label_left'}  || $mol_left_data->{'label'};
+my $label_right   = $q->{'label_right'} || $mol_right_data->{'label'};
+my $formula_left  = $mol_left_data->{'formula'};
+my $formula_right = $mol_right_data->{'formula'};
+
+# cofactor text style
+my $cofactor_style = 'font-size: 1.3em; white-space: nowrap; padding: 0 0.2em;';
+
+$structure_html = '<div style="display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; margin: 0.8em 0 0.4em 0;">';
+
+# --- left substrate structure ---
+if ($smiles_left ne '') {
+  my $w = canvas_width($smiles_left);
+  my $smiles_attr = escape_attr($smiles_left);
+  $structure_html .= '<div style="text-align: center;">'
+    . '<canvas id="mol_left" width="' . $w . '" height="200" data-smiles="' . $smiles_attr . '"></canvas>'
+    . '<div style="font-size: 0.9em; margin-top: 0.2em;">' . $label_left . '</div>';
+  if ($formula_left ne '') {
+    $structure_html .= '<div style="font-size: 0.8em; color: #555;">' . $formula_left . '</div>';
+  }
+  $structure_html .= '</div>';
+}
+
+# --- left extras (cofactors with substrate) ---
+if ($extras_left ne '') {
+  $structure_html .= '<div style="' . $cofactor_style . '">+ ' . $extras_left . '</div>';
+}
+
+# --- reaction arrow ---
+$structure_html .= '<div style="font-size: 2em;">&rarr;</div>';
+
+# --- right product structure ---
+if ($smiles_right ne '') {
+  my $w = canvas_width($smiles_right);
+  my $smiles_attr = escape_attr($smiles_right);
+  $structure_html .= '<div style="text-align: center;">'
+    . '<canvas id="mol_right" width="' . $w . '" height="200" data-smiles="' . $smiles_attr . '"></canvas>'
+    . '<div style="font-size: 0.9em; margin-top: 0.2em;">' . $label_right . '</div>';
+  if ($formula_right ne '') {
+    $structure_html .= '<div style="font-size: 0.8em; color: #555;">' . $formula_right . '</div>';
+  }
+  $structure_html .= '</div>';
+}
+
+# --- right extras (cofactors with product) ---
+if ($extras_right ne '') {
+  if ($smiles_right ne '') {
+    # cofactors after the product structure
+    $structure_html .= '<div style="' . $cofactor_style . '">+ ' . $extras_right . '</div>';
+  } else {
+    # no product structure, show cofactors as the product
+    $structure_html .= '<div style="' . $cofactor_style . '">' . $extras_right . '</div>';
+  }
+}
+
+$structure_html .= '</div>';
+
+#==========================================================
+# BUILD RADIO BUTTONS (choices stay in EC 1-6 order)
+#==========================================================
+
+$rb = RadioButtons(
+  [@choices],
+  $correct,
+  labels        => 'ABC',
+  displayLabels => 1,
+  randomize     => 0,
+  separator     => '<div style="margin-bottom: 0.7em;"></div>',
+);
+
+#==========================================================
+# HEADER (RDKIT.JS)
+#==========================================================
+
+HEADER_TEXT(<<'END_HEADER');
+<script src="https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js"></script>
+<script>
+let RDKitReady = null;
+function getRDKit() {
+	if (!RDKitReady) {
+		RDKitReady = initRDKitModule();
+	}
+	return RDKitReady;
+}
+function initMoleculeCanvases() {
+	getRDKit().then(function(RDKit) {
+		const canvases = document.querySelectorAll('canvas[data-smiles]');
+		canvases.forEach((canvas) => {
+			const smiles = canvas.dataset.smiles;
+			if (!smiles) {
+				return;
+			}
+			const mol = RDKit.get_mol(smiles);
+			const mdetails = {"explicitMethyl": true};
+			if (canvas && mol) {
+				mol.draw_to_canvas_with_highlights(canvas, JSON.stringify(mdetails));
+				mol.delete();
+			}
+		});
+	}).catch(error => {
+		console.error('Error initializing RDKit:', error);
+	});
+}
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', initMoleculeCanvases);
+} else {
+	initMoleculeCanvases();
+}
+</script>
+END_HEADER
+
+#==========================================================
+# PGML
+#==========================================================
+
+BEGIN_PGML
+
+Which one of the following enzyme classes corresponds to the biochemical reaction [$item_name]*?
+
+[$structure_html]*
+
+[_]{$rb}
+
+END_PGML
+
+BEGIN_PGML_SOLUTION
+
+The correct answer is: [$correct]*
+
+[$explanation]*
+
+END_PGML_SOLUTION
+
+ENDDOCUMENT();
